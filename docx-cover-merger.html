@@ -229,6 +229,16 @@
             color: #666;
             line-height: 1.8;
         }
+        .highlight {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .highlight strong {
+            color: #856404;
+        }
         @media (max-width: 768px) {
             .back-btn {
                 position: static;
@@ -247,38 +257,43 @@
         <div class="header">
             <a href="index.html" class="back-btn">← Dashboard</a>
             <h1>📄 DOCX Cover Page Merger</h1>
-            <p>Add a cover page to multiple DOCX files instantly</p>
+            <p>Add content files into a formatted cover page template</p>
         </div>
         <div class="content">
+            <div class="highlight">
+                <strong>✨ Complete Preservation:</strong> Headers, footers, styles, spacing, fonts - everything from the template will be preserved perfectly!
+            </div>
+
             <div class="info-box">
                 <h4>ℹ️ How it works:</h4>
                 <ul>
-                    <li>Upload ONE cover page file (single page DOCX)</li>
-                    <li>Upload MULTIPLE files that need the cover page</li>
-                    <li>Click "Process Files" to add cover page to all files</li>
-                    <li>Download merged files with original names</li>
+                    <li>Upload ONE template file with cover page, headers, footers, styles, and formatting</li>
+                    <li>Upload MULTIPLE content files to be inserted</li>
+                    <li>ALL formatting from template is preserved (headers, footers, styles, spacing)</li>
+                    <li>Each content file's text is added after the cover with a page break</li>
+                    <li>Download individual merged files (one for each content file)</li>
                 </ul>
             </div>
 
             <div class="upload-section">
-                <h3>1️⃣ Upload Cover Page (Single File)</h3>
-                <p>Select a single-page DOCX file that will be used as the cover page</p>
+                <h3>1️⃣ Upload Template File (Single File)</h3>
+                <p>Select a DOCX file with your cover page, headers, footers, and ALL formatting</p>
                 <div class="file-input-wrapper">
                     <input type="file" id="coverPageInput" accept=".docx" onchange="handleCoverPageUpload(event)">
                     <label for="coverPageInput" class="file-input-label" id="coverPageLabel">
-                        📄 Choose Cover Page File
+                        📄 Choose Template File
                     </label>
                 </div>
                 <div id="coverPageInfo" class="file-list" style="display: none;"></div>
             </div>
 
             <div class="upload-section">
-                <h3>2️⃣ Upload Target Files (Multiple Files)</h3>
-                <p>Select multiple DOCX files that will receive the cover page</p>
+                <h3>2️⃣ Upload Content Files (Multiple Files)</h3>
+                <p>Select multiple DOCX files whose content will be added after the cover page</p>
                 <div class="file-input-wrapper">
                     <input type="file" id="targetFilesInput" accept=".docx" multiple onchange="handleTargetFilesUpload(event)">
                     <label for="targetFilesInput" class="file-input-label" id="targetFilesLabel">
-                        📚 Choose Target Files
+                        📚 Choose Content Files
                     </label>
                 </div>
                 <div id="targetFilesInfo" class="file-list" style="display: none;"></div>
@@ -305,13 +320,13 @@
     </div>
 
     <script>
-        let coverPageFile = null;
-        let targetFiles = [];
+        let templateFile = null;
+        let contentFiles = [];
 
         function handleCoverPageUpload(event) {
             const file = event.target.files[0];
             if (file) {
-                coverPageFile = file;
+                templateFile = file;
                 document.getElementById('coverPageLabel').textContent = '✅ ' + file.name;
                 document.getElementById('coverPageLabel').classList.add('has-file');
                 
@@ -326,7 +341,7 @@
         function handleTargetFilesUpload(event) {
             const files = Array.from(event.target.files);
             if (files.length > 0) {
-                targetFiles = files;
+                contentFiles = files;
                 document.getElementById('targetFilesLabel').textContent = '✅ ' + files.length + ' file(s) selected';
                 document.getElementById('targetFilesLabel').classList.add('has-file');
                 
@@ -348,7 +363,7 @@
 
         function checkReadyToProcess() {
             const processBtn = document.getElementById('processBtn');
-            if (coverPageFile && targetFiles.length > 0) {
+            if (templateFile && contentFiles.length > 0) {
                 processBtn.disabled = false;
             } else {
                 processBtn.disabled = true;
@@ -377,21 +392,24 @@
             processBtn.disabled = true;
 
             try {
-                loaderProgress.textContent = 'Reading cover page...';
-                const coverPageArrayBuffer = await readFileAsArrayBuffer(coverPageFile);
-                const coverPageZip = await JSZip.loadAsync(coverPageArrayBuffer);
+                loaderProgress.textContent = 'Reading template file...';
+                const templateArrayBuffer = await readFileAsArrayBuffer(templateFile);
 
-                for (let i = 0; i < targetFiles.length; i++) {
-                    const targetFile = targetFiles[i];
-                    loaderProgress.textContent = 'Processing file ' + (i + 1) + ' of ' + targetFiles.length + ': ' + targetFile.name;
+                for (let i = 0; i < contentFiles.length; i++) {
+                    const contentFile = contentFiles[i];
+                    loaderProgress.textContent = 'Processing file ' + (i + 1) + ' of ' + contentFiles.length + ': ' + contentFile.name;
 
-                    const targetArrayBuffer = await readFileAsArrayBuffer(targetFile);
-                    const targetZip = await JSZip.loadAsync(targetArrayBuffer);
+                    const contentArrayBuffer = await readFileAsArrayBuffer(contentFile);
+                    
+                    // Create fresh copies for each merge
+                    const templateZip = await JSZip.loadAsync(templateArrayBuffer);
+                    const contentZip = await JSZip.loadAsync(contentArrayBuffer);
 
-                    const mergedZip = await mergeDocxFiles(coverPageZip, targetZip);
+                    const mergedZip = await mergeContentIntoTemplate(templateZip, contentZip);
                     const mergedBlob = await mergedZip.generateAsync({type: 'blob'});
                     
-                    saveAs(mergedBlob, targetFile.name);
+                    const fileName = contentFile.name.replace('.docx', '_with_cover.docx');
+                    saveAs(mergedBlob, fileName);
                     await new Promise(function(resolve) { setTimeout(resolve, 300); });
                 }
 
@@ -412,55 +430,71 @@
             }
         }
 
-        async function mergeDocxFiles(coverZip, targetZip) {
+        async function mergeContentIntoTemplate(templateZip, contentZip) {
+            // Start with template as base (this preserves ALL files: styles, headers, footers, rels, etc.)
             const mergedZip = new JSZip();
-
-            // Copy all files from target
-            const targetFiles = [];
-            targetZip.forEach(function(relativePath, file) {
-                targetFiles.push({path: relativePath, file: file});
+            
+            // Copy ALL files from template first
+            const copyPromises = [];
+            templateZip.forEach(function(relativePath, zipEntry) {
+                copyPromises.push(
+                    zipEntry.async('arraybuffer').then(function(content) {
+                        mergedZip.file(relativePath, content);
+                    })
+                );
             });
+            await Promise.all(copyPromises);
 
-            for (let item of targetFiles) {
-                const content = await item.file.async('arraybuffer');
-                mergedZip.file(item.path, content);
-            }
+            // Now merge the document.xml content
+            const templateDocXml = await templateZip.file('word/document.xml').async('string');
+            const contentDocXml = await contentZip.file('word/document.xml').async('string');
 
-            // Get document.xml from both
-            const coverDocXml = await coverZip.file('word/document.xml').async('string');
-            const targetDocXml = await targetZip.file('word/document.xml').async('string');
+            // Extract content body (between <w:body> and last <w:sectPr>)
+            const contentBodyStart = contentDocXml.indexOf('<w:body>') + 8;
+            const contentBodyEnd = contentDocXml.lastIndexOf('<w:sectPr');
+            let contentBodyContent = contentDocXml.substring(contentBodyStart, contentBodyEnd);
 
-            // Extract body content from cover (everything between <w:body> and <w:sectPr>)
-            const coverBodyStart = coverDocXml.indexOf('<w:body>') + 8;
-            const coverBodyEnd = coverDocXml.indexOf('<w:sectPr', coverBodyStart);
-            let coverBodyContent = coverDocXml.substring(coverBodyStart, coverBodyEnd);
+            // Find the insertion point in template (before the last </w:sectPr></w:body>)
+            const templateBodyEnd = templateDocXml.lastIndexOf('<w:sectPr');
+            const beforeSectPr = templateDocXml.substring(0, templateBodyEnd);
+            const afterSectPr = templateDocXml.substring(templateBodyEnd);
 
-            // Add page break after cover
-            const pageBreak = '<w:p><w:pPr><w:pageBreakBefore/></w:pPr><w:r><w:t></w:t></w:r></w:p>';
-            coverBodyContent += pageBreak;
+            // Create page break
+            const pageBreak = '<w:p><w:pPr><w:pageBreakBefore/></w:pPr></w:p>';
 
-            // Insert cover content into target document
-            const targetBodyStart = targetDocXml.indexOf('<w:body>') + 8;
-            const mergedDocXml = targetDocXml.substring(0, targetBodyStart) + coverBodyContent + targetDocXml.substring(targetBodyStart);
+            // Merge: template content + page break + content body + section properties
+            const mergedDocXml = beforeSectPr + pageBreak + contentBodyContent + afterSectPr;
 
+            // Update document.xml
             mergedZip.file('word/document.xml', mergedDocXml);
 
-            // Copy media files from cover page if any
-            const coverMediaFiles = [];
-            coverZip.forEach(function(relativePath) {
+            // Copy media from content file with unique names
+            let mediaCounter = 8000;
+            const mediaPromises = [];
+            
+            contentZip.forEach(function(relativePath, zipEntry) {
                 if (relativePath.indexOf('word/media/') === 0) {
-                    coverMediaFiles.push(relativePath);
+                    mediaPromises.push(
+                        zipEntry.async('arraybuffer').then(function(data) {
+                            const ext = relativePath.substring(relativePath.lastIndexOf('.'));
+                            const newPath = 'word/media/content_' + mediaCounter + ext;
+                            mediaCounter++;
+                            mergedZip.file(newPath, data);
+                            
+                            // Update document.xml to reference new media path
+                            const oldName = relativePath.substring(relativePath.lastIndexOf('/') + 1);
+                            const newName = 'content_' + (mediaCounter - 1) + ext;
+                            const currentDoc = mergedZip.file('word/document.xml').async('string');
+                            return currentDoc.then(function(doc) {
+                                const updatedDoc = doc.split(oldName).join(newName);
+                                mergedZip.file('word/document.xml', updatedDoc);
+                            });
+                        })
+                    );
                 }
             });
 
-            let mediaCounter = 1000;
-            for (let mediaPath of coverMediaFiles) {
-                const mediaContent = await coverZip.file(mediaPath).async('arraybuffer');
-                const ext = mediaPath.substring(mediaPath.lastIndexOf('.'));
-                const newMediaPath = 'word/media/cover_image' + mediaCounter + ext;
-                mergedZip.file(newMediaPath, mediaContent);
-                mediaCounter++;
-            }
+            await Promise.all(mediaPromises);
 
             return mergedZip;
         }
