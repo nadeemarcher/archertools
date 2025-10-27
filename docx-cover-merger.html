@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOCX Cover Page Merger</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.37.11/docxtemplater.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .back-btn {
+            position: absolute;
+            left: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .back-btn:hover {
+            background: white;
+            color: #667eea;
+        }
+        .content {
+            padding: 40px;
+        }
+        .upload-section {
+            margin-bottom: 30px;
+            padding: 25px;
+            border: 2px dashed #e0e0e0;
+            border-radius: 12px;
+            background: #f9f9f9;
+            transition: all 0.3s;
+        }
+        .upload-section:hover {
+            border-color: #667eea;
+            background: #f5f7ff;
+        }
+        .upload-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        .upload-section p {
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+        .file-input-label {
+            display: block;
+            padding: 15px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            color: #667eea;
+            text-align: center;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .file-input-label:hover {
+            background: #667eea;
+            color: white;
+        }
+        .file-input-label.has-file {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        .file-list {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .file-item {
+            padding: 8px;
+            margin-bottom: 5px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .file-icon {
+            color: #667eea;
+        }
+        .process-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+        .process-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        .process-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .loader-container {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        .loader-container.active {
+            display: block;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loader-text {
+            color: #667eea;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .loader-progress {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .success-message {
+            display: none;
+            padding: 20px;
+            background: #d4edda;
+            border: 2px solid #28a745;
+            border-radius: 10px;
+            color: #155724;
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        .success-message.active {
+            display: block;
+        }
+        .error-message {
+            display: none;
+            padding: 20px;
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            border-radius: 10px;
+            color: #721c24;
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        .error-message.active {
+            display: block;
+        }
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 30px;
+            border-radius: 5px;
+        }
+        .info-box h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .info-box ul {
+            margin-left: 20px;
+            color: #666;
+            line-height: 1.8;
+        }
+        @media (max-width: 768px) {
+            .back-btn {
+                position: static;
+                transform: none;
+                display: inline-block;
+                margin-bottom: 15px;
+            }
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-btn">← Dashboard</a>
+            <h1>📄 DOCX Cover Page Merger</h1>
+            <p>Add a cover page to multiple DOCX files instantly</p>
+        </div>
+        <div class="content">
+            <div class="info-box">
+                <h4>ℹ️ How it works:</h4>
+                <ul>
+                    <li>Upload ONE cover page file (single page DOCX)</li>
+                    <li>Upload MULTIPLE files that need the cover page</li>
+                    <li>Click "Process Files" to add cover page to all files</li>
+                    <li>Download merged files with original names</li>
+                </ul>
+            </div>
+
+            <div class="upload-section">
+                <h3>1️⃣ Upload Cover Page (Single File)</h3>
+                <p>Select a single-page DOCX file that will be used as the cover page</p>
+                <div class="file-input-wrapper">
+                    <input type="file" id="coverPageInput" accept=".docx" onchange="handleCoverPageUpload(event)">
+                    <label for="coverPageInput" class="file-input-label" id="coverPageLabel">
+                        📄 Choose Cover Page File
+                    </label>
+                </div>
+                <div id="coverPageInfo" class="file-list" style="display: none;"></div>
+            </div>
+
+            <div class="upload-section">
+                <h3>2️⃣ Upload Target Files (Multiple Files)</h3>
+                <p>Select multiple DOCX files that will receive the cover page</p>
+                <div class="file-input-wrapper">
+                    <input type="file" id="targetFilesInput" accept=".docx" multiple onchange="handleTargetFilesUpload(event)">
+                    <label for="targetFilesInput" class="file-input-label" id="targetFilesLabel">
+                        📚 Choose Target Files
+                    </label>
+                </div>
+                <div id="targetFilesInfo" class="file-list" style="display: none;"></div>
+            </div>
+
+            <button class="process-btn" id="processBtn" onclick="processFiles()" disabled>
+                🚀 Process Files
+            </button>
+
+            <div class="loader-container" id="loaderContainer">
+                <div class="loader"></div>
+                <div class="loader-text">Processing files...</div>
+                <div class="loader-progress" id="loaderProgress">Please wait...</div>
+            </div>
+
+            <div class="success-message" id="successMessage">
+                ✅ All files processed successfully! Files are downloading...
+            </div>
+
+            <div class="error-message" id="errorMessage">
+                ❌ <span id="errorText">An error occurred. Please try again.</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let coverPageFile = null;
+        let targetFiles = [];
+
+        function handleCoverPageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                coverPageFile = file;
+                document.getElementById('coverPageLabel').textContent = '✅ ' + file.name;
+                document.getElementById('coverPageLabel').classList.add('has-file');
+                
+                const infoDiv = document.getElementById('coverPageInfo');
+                infoDiv.style.display = 'block';
+                infoDiv.innerHTML = `
+                    <div class="file-item">
+                        <span class="file-icon">📄</span>
+                        <span>${file.name} (${formatFileSize(file.size)})</span>
+                    </div>
+                `;
+                
+                checkReadyToProcess();
+            }
+        }
+
+        function handleTargetFilesUpload(event) {
+            const files = Array.from(event.target.files);
+            if (files.length > 0) {
+                targetFiles = files;
+                document.getElementById('targetFilesLabel').textContent = `✅ ${files.length} file(s) selected`;
+                document.getElementById('targetFilesLabel').classList.add('has-file');
+                
+                const infoDiv = document.getElementById('targetFilesInfo');
+                infoDiv.style.display = 'block';
+                infoDiv.innerHTML = files.map(file => `
+                    <div class="file-item">
+                        <span class="file-icon">📄</span>
+                        <span>${file.name} (${formatFileSize(file.size)})</span>
+                    </div>
+                `).join('');
+                
+                checkReadyToProcess();
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        function checkReadyToProcess() {
+            const processBtn = document.getElementById('processBtn');
+            if (coverPageFile && targetFiles.length > 0) {
+                processBtn.disabled = false;
+            } else {
+                processBtn.disabled = true;
+            }
+        }
+
+        async function processFiles() {
+            const loaderContainer = document.getElementById('loaderContainer');
+            const successMessage = document.getElementById('successMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            const processBtn = document.getElementById('processBtn');
+            const loaderProgress = document.getElementById('loaderProgress');
+
+            // Hide previous messages
+            successMessage.classList.remove('active');
+            errorMessage.classList.remove('active');
+            
+            // Show loader
+            loaderContainer.classList.add('active');
+            processBtn.disabled = true;
+
+            try {
+                // Read cover page
+                loaderProgress.textContent = 'Reading cover page...';
+                const coverPageContent = await readFileAsArrayBuffer(coverPageFile);
+                const coverPageZip = new JSZip();
+                await coverPageZip.loadAsync(coverPageContent);
+
+                // Process each target file
+                for (let i = 0; i < targetFiles.length; i++) {
+                    const targetFile = targetFiles[i];
+                    loaderProgress.textContent = `Processing file ${i + 1} of ${targetFiles.length}: ${targetFile.name}`;
+
+                    // Read target file
+                    const targetContent = await readFileAsArrayBuffer(targetFile);
+                    const targetZip = new JSZip();
+                    await targetZip.loadAsync(targetContent);
+
+                    // Merge documents
+                    const mergedZip = await mergeDocuments(coverPageZip, targetZip);
+
+                    // Generate blob and download
+                    const mergedBlob = await mergedZip.generateAsync({type: 'blob'});
+                    saveAs(mergedBlob, targetFile.name);
+
+                    // Small delay between downloads
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+
+                // Success
+                loaderContainer.classList.remove('active');
+                successMessage.classList.add('active');
+                
+                // Reset after 3 seconds
+                setTimeout(() => {
+                    successMessage.classList.remove('active');
+                    processBtn.disabled = false;
+                }, 3000);
+
+            } catch (error) {
+                console.error('Error processing files:', error);
+                loaderContainer.classList.remove('active');
+                document.getElementById('errorText').textContent = 'Error: ' + error.message;
+                errorMessage.classList.add('active');
+                processBtn.disabled = false;
+            }
+        }
+
+        async function mergeDocuments(coverPageZip, targetZip) {
+            // Create a new zip for the merged document
+            const mergedZip = new JSZip();
+
+            // Copy all files from target document
+            targetZip.forEach((relativePath, file) => {
+                mergedZip.file(relativePath, file.async('arraybuffer'));
+            });
+
+            // Get document.xml from both files
+            const coverDocXml = await coverPageZip.file('word/document.xml').async('string');
+            const targetDocXml = await targetZip.file('word/document.xml').async('string');
+
+            // Extract body content from cover page
+            const coverBodyMatch = coverDocXml.match(/<w:body>([\s\S]*?)<w:sectPr>/);
+            const coverBodyContent = coverBodyMatch ? coverBodyMatch[1] : '';
+
+            // Add page break and merge content
+            const pageBreak = '<w:p><w:pPr><w:pageBreakBefore/></w:pPr></w:p>';
+            
+            // Insert cover page content before target content
+            const mergedDocXml = targetDocXml.replace(
+                /(<w:body>)/,
+                `$1${coverBodyContent}${pageBreak}`
+            );
+
+            // Update document.xml in merged zip
+            mergedZip.file('word/document.xml', mergedDocXml);
+
+            // Copy any media files from cover page
+            const coverMediaFiles = [];
+            coverPageZip.forEach((relativePath, file) => {
+                if (relativePath.startsWith('word/media/')) {
+                    coverMediaFiles.push(relativePath);
+                }
+            });
+
+            for (const mediaPath of coverMediaFiles) {
+                const mediaContent = await coverPageZip.file(mediaPath).async('arraybuffer');
+                // Rename to avoid conflicts
+                const newMediaPath = mediaPath.replace('media/', 'media/cover_');
+                mergedZip.file(newMediaPath, mediaContent);
+            }
+
+            return mergedZip;
+        }
+
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(e);
+                reader.readAsArrayBuffer(file);
+            });
+        }
+    </script>
+</body>
+</html>
